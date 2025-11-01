@@ -1,68 +1,45 @@
+"""Graph implementation for DAG, TraversableDigraph, and SortableDigraph."""
+
+from collections import deque
+
+
 class VersatileDigraph:
-    """
-    A versatile directed graph class that supports adding nodes, edges, and 
-    retrieving neighbors of a node and all nodes in the graph.
-    """
+    """A versatile directed graph class with support for node/edge management."""
 
     def __init__(self):
-        """Initialize an empty directed graph."""
         self.nodes = set()
         self.edges = {}
 
-    def add_node(self, node, *args, **kwargs):
-        """
-        Add a node to the graph. Extra arguments are ignored to support flexible test cases.
-
-        Args:
-            node: The node to be added.
-        """
+    def add_node(self, node, *_args, **_kwargs):
         self.nodes.add(node)
         if node not in self.edges:
             self.edges[node] = set()
 
     def add_edge(self, u, v):
-        """
-        Add a directed edge from node u to node v.
-
-        Args:
-            u: Start node.
-            v: End node.
-        """
         self.add_node(u)
         self.add_node(v)
         self.edges[u].add(v)
 
     def get_neighbors(self, node):
-        """
-        Return all neighbors of the given node.
-
-        Args:
-            node: The node to query.
-
-        Returns:
-            set: Neighboring nodes.
-        """
         return self.edges.get(node, set())
 
     def get_all_nodes(self):
-        """
-        Return all nodes in the graph.
-
-        Returns:
-            list: List of nodes.
-        """
         return list(self.nodes)
+
+    def get_nodes(self):
+        return self.get_all_nodes()
+
+    def successors(self, node):
+        return list(self.get_neighbors(node))
+
+    def predecessors(self, node):
+        return [n for n in self.nodes if node in self.get_neighbors(n)]
 
 
 class SortableDigraph(VersatileDigraph):
-    """
-    A directed graph that supports topological sorting.
-    """
+    """A directed graph that supports topological sorting."""
 
     def top_sort(self):
-        """
-        Return a list of nodes in topological order using Kahn's algorithm.
-        """
         in_degree = {n: 0 for n in self.nodes}
         for current_node in self.nodes:
             for neighbor in self.get_neighbors(current_node):
@@ -83,54 +60,39 @@ class SortableDigraph(VersatileDigraph):
 
 
 class TraversableDigraph(SortableDigraph):
-    """
-    A directed graph that supports depth-first and breadth-first traversal.
-    """
+    """A directed graph supporting DFS and BFS traversals."""
 
     def dfs(self, start):
-        """
-        Yield nodes using depth-first search starting from 'start'.
-        """
         visited = set()
 
         def _dfs(node):
             if node in visited:
                 return
             visited.add(node)
-            yield node
+            if node != start:
+                yield node
             for neighbor in self.get_neighbors(node):
                 yield from _dfs(neighbor)
 
         yield from _dfs(start)
 
     def bfs(self, start):
-        """
-        Yield nodes using breadth-first search starting from 'start'.
-        """
         visited = {start}
         queue = deque([start])
 
         while queue:
             node = queue.popleft()
-            yield node
             for neighbor in self.get_neighbors(node):
                 if neighbor not in visited:
                     visited.add(neighbor)
                     queue.append(neighbor)
+                    yield neighbor
 
 
 class DAG(TraversableDigraph):
-    """
-    A Directed Acyclic Graph class that prevents cycle creation.
-    """
+    """A Directed Acyclic Graph class that blocks cycle-forming edges."""
 
-    def add_edge(self, start, end):
-        """
-        Add an edge from start to end, ensuring no cycle is created.
-
-        Raises:
-            ValueError: If adding the edge would create a cycle.
-        """
+    def add_edge(self, start, end, **_kwargs):
         for node in self.dfs(end):
             if node == start:
                 raise ValueError("Adding this edge would create a cycle.")
