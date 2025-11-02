@@ -1,106 +1,126 @@
+"""Directed Graph and DAG implementation for graph traversal and testing."""
+
 from collections import deque
 
-class SortableDigraph:
-    """
-    Base class representing a simple directed graph.
-    Stores nodes and directed edges in a dictionary.
-    """
+class TraversableDigraph:
+    """A basic directed graph supporting node addition and traversal."""
 
     def __init__(self):
-        # Each key is a node; each value is a list of neighbors (successors)
-        self.graph = {}
-        # Optional: store node values if tests require
-        self.node_values = {}
+        self.adj_list = {}
+        self.node_weights = {}
 
-    def add_node(self, node, value=None):
-        """
-        Add a node to the graph.
-        If 'value' is provided, store it in the node_values dictionary.
-        """
-        if node not in self.graph:
-            self.graph[node] = []
-        if value is not None:
-            self.node_values[node] = value
+    def add_node(self, node, node_weight=None):
+        """Add a node with an optional weight."""
+        if node not in self.adj_list:
+            self.adj_list[node] = []
+            self.node_weights[node] = node_weight
 
-    def add_edge(self, src, dst):
-        """
-        Add a directed edge from src to dst.
-        Automatically adds missing nodes.
-        """
-        if src not in self.graph:
+    def get_nodes(self):
+        """Return all node labels."""
+        return list(self.adj_list.keys())
+
+    def add_edge(self, src, dst, edge_weight=None):
+        """Add a directed edge from src to dst with optional edge weight."""
+        if src not in self.adj_list:
             self.add_node(src)
-        if dst not in self.graph:
+        if dst not in self.adj_list:
             self.add_node(dst)
-        self.graph[src].append(dst)
-
-    def neighbors(self, node):
-        """Return a list of all nodes directly reachable from 'node'."""
-        return self.graph.get(node, [])
-
-    def get_successors(self, node):
-        """Alias for neighbors(node)"""
-        return self.neighbors(node)
-
-    def get_predecessors(self, node):
-        """Return all nodes that have an edge pointing to this node."""
-        return [n for n, neighbors in self.graph.items() if node in neighbors]
-
-    def __contains__(self, node):
-        return node in self.graph
-
-    def __repr__(self):
-        return f"{self.graph}"
-
-
-# ============================================================
-# TraversableDigraph
-# ============================================================
-class TraversableDigraph(SortableDigraph):
-    """Directed graph that supports DFS and BFS traversal."""
-
-    def dfs(self, start, visited=None):
-        """Depth-First Search traversal implemented as a generator."""
-        if visited is None:
-            visited = set()
-        visited.add(start)
-        yield start
-        for neighbor in self.neighbors(start):
-            if neighbor not in visited:
-                yield from self.dfs(neighbor, visited)
+        self.adj_list[src].append((dst, edge_weight))
 
     def bfs(self, start):
-        """Breadth-First Search traversal using a queue."""
-        visited = set([start])
+        """Perform BFS traversal starting from `start` (excluding the start node in output)."""
+        visited = set()
         queue = deque([start])
+        order = []
+        visited.add(start)
         while queue:
             node = queue.popleft()
-            yield node
-            for neighbor in self.neighbors(node):
+            for neighbor, _ in self.adj_list.get(node, []):
                 if neighbor not in visited:
                     visited.add(neighbor)
+                    order.append(neighbor)
                     queue.append(neighbor)
+        return order
 
+    def dfs(self, start):
+        """Perform DFS traversal starting from `start` (excluding the start node in output)."""
+        visited = set()
+        order = []
 
-# ============================================================
-# DAG
-# ============================================================
-class DAG(TraversableDigraph):
-    """Directed Acyclic Graph (no cycles allowed)."""
+        def dfs_visit(node):
+            for neighbor, _ in self.adj_list.get(node, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    order.append(neighbor)
+                    dfs_visit(neighbor)
 
-    def add_edge(self, src, dst):
-        """Add an edge only if it doesn't create a directed cycle."""
-        if self._has_path(dst, src):
-            raise ValueError(f"Adding edge {src} -> {dst} would create a cycle.")
-        super().add_edge(src, dst)
-
-    def _has_path(self, start, target, visited=None):
-        """Check if there is a path from start to target (to detect cycles)."""
-        if visited is None:
-            visited = set()
-        if start == target:
-            return True
         visited.add(start)
-        for neighbor in self.neighbors(start):
-            if neighbor not in visited and self._has_path(neighbor, target, visited):
+        dfs_visit(start)
+        return order
+
+
+class DAG(TraversableDigraph):
+    """Directed Acyclic Graph with cycle detection and topological sorting."""
+
+    def __init__(self):
+        super().__init__()
+
+    def add_edge(self, src, dst, edge_weight=None):
+        """Add an edge while ensuring no cycles are introduced."""
+        super().add_edge(src, dst, edge_weight)
+        if self._creates_cycle():
+            # Remove the last added edge if it creates a cycle
+            self.adj_list[src].remove((dst, edge_weight))
+            raise ValueError("Adding this edge creates a cycle in the DAG.")
+
+    def _creates_cycle(self):
+        """Detect if the graph has a cycle (DFS-based detection)."""
+        visited = set()
+        rec_stack = set()
+
+        def dfs(node):
+            visited.add(node)
+            rec_stack.add(node)
+            for neighbor, _ in self.adj_list.get(node, []):
+                if neighbor not in visited and dfs(neighbor):
+                    return True
+                elif neighbor in rec_stack:
+                    return True
+            rec_stack.remove(node)
+            return False
+
+        for node in self.adj_list:
+            if node not in visited and dfs(node):
                 return True
         return False
+
+    def top_sort(self):
+        """Perform topological sort (Kahn's Algorithm)."""
+        in_degree = {node: 0 for node in self.adj_list}
+        for src in self.adj_list:
+            for dst, _ in self.adj_list[src]:
+                in_degree[dst] += 1
+
+        queue = deque([n for n in in_degree if in_degree[n] == 0])
+        result = []
+        while queue:
+            node = queue.popleft()
+            result.append(node)
+            for neighbor, _ in self.adj_list.get(node, []):
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+        return result
+
+    def successors(self, node):
+        """Return successors of a node."""
+        return [n for n, _ in self.adj_list.get(node, [])]
+
+    def predecessors(self, node):
+        """Return predecessors of a node."""
+        preds = []
+        for src in self.adj_list:
+            for dst, _ in self.adj_list[src]:
+                if dst == node:
+                    preds.append(src)
+        return preds
