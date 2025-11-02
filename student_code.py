@@ -1,6 +1,10 @@
-"""Directed Graph and DAG implementation for graph traversal and testing."""
+"""student_code.py
+Directed Graph and DAG implementation for traversal, topological sorting, and testing.
+This module follows PEP8 and Pylint clean style conventions.
+"""
 
 from collections import deque
+
 
 class TraversableDigraph:
     """A basic directed graph supporting node addition and traversal."""
@@ -19,6 +23,10 @@ class TraversableDigraph:
         """Return all node labels."""
         return list(self.adj_list.keys())
 
+    def get_node_value(self, node):
+        """Return stored weight/value of a node."""
+        return self.node_weights.get(node, None)
+
     def add_edge(self, src, dst, edge_weight=None):
         """Add a directed edge from src to dst with optional edge weight."""
         if src not in self.adj_list:
@@ -27,8 +35,15 @@ class TraversableDigraph:
             self.add_node(dst)
         self.adj_list[src].append((dst, edge_weight))
 
+    def get_edge_weight(self, src, dst):
+        """Return the weight of an edge if it exists."""
+        for neighbor, weight in self.adj_list.get(src, []):
+            if neighbor == dst:
+                return weight
+        return None
+
     def bfs(self, start):
-        """Perform BFS traversal starting from `start` (excluding the start node in output)."""
+        """Perform BFS traversal starting from `start` (excluding the start node)."""
         visited = set()
         queue = deque([start])
         order = []
@@ -43,7 +58,7 @@ class TraversableDigraph:
         return order
 
     def dfs(self, start):
-        """Perform DFS traversal starting from `start` (excluding the start node in output)."""
+        """Perform DFS traversal starting from `start` (excluding the start node)."""
         visited = set()
         order = []
 
@@ -63,6 +78,7 @@ class DAG(TraversableDigraph):
     """Directed Acyclic Graph with cycle detection and topological sorting."""
 
     def __init__(self):
+        # pylint: disable=useless-parent-delegation
         super().__init__()
 
     def add_edge(self, src, dst, edge_weight=None):
@@ -70,11 +86,13 @@ class DAG(TraversableDigraph):
         super().add_edge(src, dst, edge_weight)
         if self._creates_cycle():
             # Remove the last added edge if it creates a cycle
-            self.adj_list[src].remove((dst, edge_weight))
+            self.adj_list[src] = [
+                (n, w) for n, w in self.adj_list[src] if n != dst or w != edge_weight
+            ]
             raise ValueError("Adding this edge creates a cycle in the DAG.")
 
     def _creates_cycle(self):
-        """Detect if the graph has a cycle (DFS-based detection)."""
+        """Detect if the graph has a cycle using DFS-based detection."""
         visited = set()
         rec_stack = set()
 
@@ -84,7 +102,7 @@ class DAG(TraversableDigraph):
             for neighbor, _ in self.adj_list.get(node, []):
                 if neighbor not in visited and dfs(neighbor):
                     return True
-                elif neighbor in rec_stack:
+                if neighbor in rec_stack:
                     return True
             rec_stack.remove(node)
             return False
@@ -97,11 +115,11 @@ class DAG(TraversableDigraph):
     def top_sort(self):
         """Perform topological sort (Kahn's Algorithm)."""
         in_degree = {node: 0 for node in self.adj_list}
-        for src in self.adj_list:
-            for dst, _ in self.adj_list[src]:
+        for src, edges in self.adj_list.items():  # ✅ fixed pylint C0206
+            for dst, _ in edges:
                 in_degree[dst] += 1
 
-        queue = deque([n for n in in_degree if in_degree[n] == 0])
+        queue = deque([n for n, deg in in_degree.items() if deg == 0])  # ✅ .items()
         result = []
         while queue:
             node = queue.popleft()
@@ -119,8 +137,8 @@ class DAG(TraversableDigraph):
     def predecessors(self, node):
         """Return predecessors of a node."""
         preds = []
-        for src in self.adj_list:
-            for dst, _ in self.adj_list[src]:
+        for src, edges in self.adj_list.items():  # ✅ fixed pylint C0206
+            for dst, _ in edges:
                 if dst == node:
                     preds.append(src)
         return preds
