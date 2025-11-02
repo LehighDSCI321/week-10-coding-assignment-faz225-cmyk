@@ -1,6 +1,7 @@
 """student_code.py
-Directed Graph (TraversableDigraph) and Directed Acyclic Graph (DAG)
-implementation supporting traversal, topological sorting, and graph utilities.
+Implementation of a Directed Graph (TraversableDigraph)
+and a Directed Acyclic Graph (DAG) with traversal,
+cycle detection, and topological sorting.
 
 Fully Pylint-compliant (score: 10.00/10).
 """
@@ -9,12 +10,12 @@ from collections import deque
 
 
 class TraversableDigraph:
-    """A basic directed graph supporting node addition, traversal, and edge weights."""
+    """Basic directed graph supporting nodes, edges, and traversal."""
 
     def __init__(self):
-        """Initialize adjacency list and node weight storage."""
-        self.adj_list = {}
-        self.node_weights = {}
+        """Initialize adjacency list and node-weight mapping."""
+        self.adj_list = {}        # adjacency list: node → list of (neighbor, weight)
+        self.node_weights = {}    # stores optional node values/weights
 
     def add_node(self, node, node_weight=None):
         """Add a node with an optional weight."""
@@ -23,15 +24,15 @@ class TraversableDigraph:
             self.node_weights[node] = node_weight
 
     def get_nodes(self):
-        """Return a list of all node labels."""
+        """Return all node labels as a list."""
         return list(self.adj_list.keys())
 
     def get_node_value(self, node):
-        """Return stored weight/value of a node."""
+        """Return the stored value/weight of a node (or None)."""
         return self.node_weights.get(node, None)
 
     def add_edge(self, src, dst, edge_weight=None):
-        """Add a directed edge from src to dst with optional edge weight."""
+        """Add a directed edge from src → dst with optional edge weight."""
         if src not in self.adj_list:
             self.add_node(src)
         if dst not in self.adj_list:
@@ -39,14 +40,15 @@ class TraversableDigraph:
         self.adj_list[src].append((dst, edge_weight))
 
     def get_edge_weight(self, src, dst):
-        """Return the weight of an edge if it exists."""
+        """Return the weight of the edge src → dst, or None if not found."""
         for neighbor, weight in self.adj_list.get(src, []):
             if neighbor == dst:
                 return weight
         return None
 
     def bfs(self, start):
-        """Perform BFS traversal starting from `start` (excluding the start node)."""
+        """Perform Breadth-First Search starting from `start`
+        (excluding the start node itself)."""
         visited = set()
         queue = deque([start])
         order = []
@@ -61,12 +63,13 @@ class TraversableDigraph:
         return order
 
     def dfs(self, start):
-        """Perform DFS traversal starting from `start` (excluding the start node)."""
+        """Perform Depth-First Search starting from `start`
+        (excluding the start node itself)."""
         visited = set()
         order = []
 
         def dfs_visit(node):
-            """Helper recursive DFS function."""
+            """Recursive helper for DFS."""
             for neighbor, _ in self.adj_list.get(node, []):
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -79,29 +82,25 @@ class TraversableDigraph:
 
 
 class DAG(TraversableDigraph):
-    """Directed Acyclic Graph (DAG) with cycle detection and topological sorting."""
-
-    def __init__(self):
-        """Initialize a Directed Acyclic Graph."""
-        super().__init__()
+    """Directed Acyclic Graph (DAG) with cycle detection and topological sort."""
 
     def add_edge(self, src, dst, edge_weight=None):
-        """Add an edge while ensuring no cycles are introduced."""
+        """Add an edge ensuring that no cycles are created."""
         super().add_edge(src, dst, edge_weight)
         if self._creates_cycle():
-            # Remove the last added edge if it creates a cycle
+            # remove the edge if it creates a cycle
             self.adj_list[src] = [
                 (n, w) for n, w in self.adj_list[src] if n != dst or w != edge_weight
             ]
             raise ValueError("Adding this edge creates a cycle in the DAG.")
 
     def _creates_cycle(self):
-        """Detect if the graph has a cycle using DFS-based detection."""
+        """Detect if the graph currently contains a cycle using DFS."""
         visited = set()
         rec_stack = set()
 
         def dfs(node):
-            """Recursive DFS to detect cycles."""
+            """Recursive helper for cycle detection."""
             visited.add(node)
             rec_stack.add(node)
             for neighbor, _ in self.adj_list.get(node, []):
@@ -118,9 +117,9 @@ class DAG(TraversableDigraph):
         return False
 
     def top_sort(self):
-        """Perform topological sort (Kahn's Algorithm)."""
+        """Perform topological sort using Kahn’s algorithm."""
         in_degree = {node: 0 for node in self.adj_list}
-        for src, edges in self.adj_list.items():
+        for _, edges in self.adj_list.items():
             for dst, _ in edges:
                 in_degree[dst] += 1
 
@@ -136,11 +135,11 @@ class DAG(TraversableDigraph):
         return result
 
     def successors(self, node):
-        """Return successors of a node."""
+        """Return all successors (out-neighbors) of the given node."""
         return [n for n, _ in self.adj_list.get(node, [])]
 
     def predecessors(self, node):
-        """Return predecessors of a node."""
+        """Return all predecessors (in-neighbors) of the given node."""
         return [
             src for src, edges in self.adj_list.items()
             if any(dst == node for dst, _ in edges)
